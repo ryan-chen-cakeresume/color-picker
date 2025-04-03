@@ -56,7 +56,9 @@
       let lastUpdateTime = 0;
 
       navigator.mediaDevices
-        .getUserMedia({ video: true })
+        .getUserMedia({
+          video: { facingMode: { ideal: 'environment' } }, // 嘗試後鏡頭，但不強求
+        })
         .then((stream) => {
           video.srcObject = stream;
         })
