@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>相機顏色偵測器</title>
+    <style>
+      video,
+      canvas {
+        width: 100%;
+        max-width: 400px;
+        border: 2px solid black;
+        display: block;
+        margin-bottom: 8px;
+      }
+
+      #color-box,
+      #target-box {
+        width: 50px;
+        height: 50px;
+        border: 1px solid #000;
+        display: inline-block;
+        vertical-align: middle;
+        margin-left: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas" width="400" height="300"></canvas>
+
+    <p>
+      畫面中心平均色：<span id="color-value">-</span>
+      <span id="color-box"></span>
+    </p>
+    <p>
+      目標顏色：
+      <input type="color" id="target-picker" value="#6496C8" />
+      <span id="target-box" style="background-color: #6496c8"></span>
+    </p>
+    <p>顏色距離（RGB）：<span id="distance-value">-</span></p>
+    <video id="video" autoplay muted playsinline></video>
+
+    <script>
+      const video = document.getElementById('video');
+      const canvas = document.getElementById('canvas');
+      const ctx = canvas.getContext('2d');
+      const colorValue = document.getElementById('color-value');
+      const colorBox = document.getElementById('color-box');
+      const distanceValue = document.getElementById('distance-value');
+      const targetBox = document.getElementById('target-box');
+      const targetPicker = document.getElementById('target-picker');
+
+      let targetColor = hexToRGB(targetPicker.value);
+      let smoothDistance = 0;
+      const smoothingFactor = 0.2;
+      const updateInterval = 300; // 毫秒
+      let lastUpdateTime = 0;
+
+      navigator.mediaDevices
+        .getUserMedia({ video: true })
+        .then((stream) => {
+          video.srcObject = stream;
+        })
+        .catch((err) => {
+          alert('無法啟動相機：' + err);
+        });
+
+      video.addEventListener('loadedmetadata', () => {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+      });
+
+      targetPicker.addEventListener('input', (e) => {
+        targetColor = hexToRGB(e.target.value);
+        targetBox.style.backgroundColor = e.target.value;
+      });
+
+      function hexToRGB(hex) {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return { r, g, b };
+      }
+
+      function getColorDistance(c1, c2) {
+        return Math.sqrt(
+          Math.pow(c1.r - c2.r, 2) +
+            Math.pow(c1.g - c2.g, 2) +
+            Math.pow(c1.b - c2.b, 2)
+        );
+      }
+
+      function analyzeColor() {
+        const boxSize = 50;
+        const startX = canvas.width / 2 - boxSize / 2;
+        const startY = canvas.height / 2 - boxSize / 2;
+        const pixelData = ctx.getImageData(
+          startX,
+          startY,
+          boxSize,
+          boxSize
+        ).data;
+
+        let r = 0,
+          g = 0,
+          b = 0;
+        const totalPixels = boxSize * boxSize;
+        for (let i = 0; i < pixelData.length; i += 4) {
+          r += pixelData[i];
+          g += pixelData[i + 1];
+          b += pixelData[i + 2];
+        }
+        r = Math.round(r / totalPixels);
+        g = Math.round(g / totalPixels);
+        b = Math.round(b / totalPixels);
+
+        const currentColor = { r, g, b };
+        const distance = getColorDistance(currentColor, targetColor);
+
+        // 平滑處理
+        smoothDistance =
+          smoothDistance * (1 - smoothingFactor) + distance * smoothingFactor;
+
+        // 顯示更新
+        colorValue.textContent = `RGB(${r}, ${g}, ${b})`;
+        colorBox.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+        distanceValue.textContent = smoothDistance.toFixed(2);
+      }
+
+      function renderLoop(timestamp) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const boxSize = 50;
+        const startX = canvas.width / 2 - boxSize / 2;
+        const startY = canvas.height / 2 - boxSize / 2;
+        ctx.strokeStyle = 'red';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(startX, startY, boxSize, boxSize);
+
+        if (timestamp - lastUpdateTime > updateInterval) {
+          lastUpdateTime = timestamp;
+          analyzeColor();
+        }
+
+        requestAnimationFrame(renderLoop);
+      }
+
+      video.addEventListener('playing', () => {
+        requestAnimationFrame(renderLoop);
+      });
+    </script>
+  </body>
+</html>
