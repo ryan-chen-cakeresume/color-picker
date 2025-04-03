@@ -52,12 +52,10 @@
       let targetColor = hexToRGB(targetPicker.value);
       let smoothDistance = 0;
       const smoothingFactor = 0.2;
-      const updateInterval = 300; // 毫秒
-      let lastUpdateTime = 0;
 
       navigator.mediaDevices
         .getUserMedia({
-          video: { facingMode: { ideal: 'environment' } }, // 嘗試後鏡頭，但不強求
+          video: { facingMode: { ideal: 'environment' } }
         })
         .then((stream) => {
           video.srcObject = stream;
@@ -91,10 +89,13 @@
         );
       }
 
-      function analyzeColor() {
+      function renderLoop() {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
         const boxSize = 50;
         const startX = canvas.width / 2 - boxSize / 2;
         const startY = canvas.height / 2 - boxSize / 2;
+
         const pixelData = ctx.getImageData(
           startX,
           startY,
@@ -118,30 +119,18 @@
         const currentColor = { r, g, b };
         const distance = getColorDistance(currentColor, targetColor);
 
-        // 平滑處理
         smoothDistance =
           smoothDistance * (1 - smoothingFactor) + distance * smoothingFactor;
 
-        // 顯示更新
+        // 更新 UI
         colorValue.textContent = `RGB(${r}, ${g}, ${b})`;
         colorBox.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
         distanceValue.textContent = smoothDistance.toFixed(2);
-      }
 
-      function renderLoop(timestamp) {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-        const boxSize = 50;
-        const startX = canvas.width / 2 - boxSize / 2;
-        const startY = canvas.height / 2 - boxSize / 2;
+        // 畫紅框
         ctx.strokeStyle = 'red';
         ctx.lineWidth = 2;
         ctx.strokeRect(startX, startY, boxSize, boxSize);
-
-        if (timestamp - lastUpdateTime > updateInterval) {
-          lastUpdateTime = timestamp;
-          analyzeColor();
-        }
 
         requestAnimationFrame(renderLoop);
       }
